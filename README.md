@@ -51,8 +51,9 @@ docs/                 превью и картинки
 Установка:
 
 ```bash
-mkdir -p ~/.hermes/pets/r2d2
-cp pet/spritesheet.png pet/pet.json ~/.hermes/pets/r2d2/
+H="${HERMES_HOME:-$HOME/.hermes}"
+mkdir -p "$H/pets/r2d2"
+cp pet/spritesheet.png pet/pet.json "$H/pets/r2d2/"
 hermes pets select r2d2          # запишет display.pet.slug и включит показ
 hermes config set display.pet.scale 0.4   # размер (по умолчанию 0.33)
 ```
@@ -83,7 +84,8 @@ Git не нужен: все файлы лежат в репозитории по
 ```bash
 hermes --version
 hermes pets --help | head -3
-ls -d ~/.hermes/pets 2>/dev/null || echo "папки pets пока нет — создастся на шаге 2"
+H="${HERMES_HOME:-$HOME/.hermes}"; echo "дом Hermes: $H"
+ls -d "$H/pets" 2>/dev/null || echo "папки pets пока нет — создастся на шаге 2"
 ```
 
 ### Шаг 1. Задать адрес репозитория (чтобы не повторять длинные URL)
@@ -95,16 +97,17 @@ REPO=https://raw.githubusercontent.com/Haidegger22/hermes-r2d2-pet/main
 ### Шаг 2. Создать папки и скачать файлы
 
 ```bash
-mkdir -p ~/.hermes/pets/r2d2 ~/.hermes/desktop-plugins/r2-voice
+H="${HERMES_HOME:-$HOME/.hermes}"
+mkdir -p "$H/pets/r2d2" "$H/desktop-plugins/r2-voice"
 
 # спрайт-атлас (423 КБ) — сам питомец
-curl -fL -o ~/.hermes/pets/r2d2/spritesheet.png "$REPO/pet/spritesheet.png"
+curl -fsSL -o "$H/pets/r2d2/spritesheet.png" "$REPO/pet/spritesheet.png"
 
 # метаданные: имя, описание, откуда брать картинку
-curl -fL -o ~/.hermes/pets/r2d2/pet.json       "$REPO/pet/pet.json"
+curl -fsSL -o "$H/pets/r2d2/pet.json" "$REPO/pet/pet.json"
 
 # плагин речевого пузыря (необязательно, можно поставить позже)
-curl -fL -o ~/.hermes/desktop-plugins/r2-voice/plugin.js \
+curl -fsSL -o "$H/desktop-plugins/r2-voice/plugin.js" \
   "$REPO/desktop-plugins/r2-voice/plugin.js"
 ```
 
@@ -114,9 +117,10 @@ curl -fL -o ~/.hermes/desktop-plugins/r2-voice/plugin.js \
 ### Шаг 3. Проверить, что скачалось именно то
 
 ```bash
-ls -l ~/.hermes/pets/r2d2/
-file ~/.hermes/pets/r2d2/spritesheet.png
-cat ~/.hermes/pets/r2d2/pet.json
+H="${HERMES_HOME:-$HOME/.hermes}"
+ls -l "$H/pets/r2d2/"
+file "$H/pets/r2d2/spritesheet.png"
+cat "$H/pets/r2d2/pet.json"
 ```
 
 Ожидаемо: `spritesheet.png` — PNG 1536×1872, размер около 423 КБ; `pet.json` — короткий JSON с
@@ -202,23 +206,39 @@ document.querySelector('[data-slot="pet-plugin-bubble"]')?.innerText
 cd /tmp
 curl -fL -o r2.tgz https://github.com/Haidegger22/hermes-r2d2-pet/archive/refs/heads/main.tar.gz
 tar xzf r2.tgz
-mkdir -p ~/.hermes/pets/r2d2 ~/.hermes/desktop-plugins/r2-voice
-cp hermes-r2d2-pet-main/pet/spritesheet.png hermes-r2d2-pet-main/pet/pet.json ~/.hermes/pets/r2d2/
-cp hermes-r2d2-pet-main/desktop-plugins/r2-voice/plugin.js ~/.hermes/desktop-plugins/r2-voice/
+H="${HERMES_HOME:-$HOME/.hermes}"
+mkdir -p "$H/pets/r2d2" "$H/desktop-plugins/r2-voice"
+cp hermes-r2d2-pet-main/pet/spritesheet.png hermes-r2d2-pet-main/pet/pet.json "$H/pets/r2d2/"
+cp hermes-r2d2-pet-main/desktop-plugins/r2-voice/plugin.js "$H/desktop-plugins/r2-voice/"
 ```
 
 ### Шаг 8. Откат и удаление
 
 ```bash
-hermes pets off                      # спрятать питомца
-hermes pets remove r2d2              # удалить файлы питомца из ~/.hermes/pets/
-rm -rf ~/.hermes/desktop-plugins/r2-voice    # убрать речевой пузырь
+H="${HERMES_HOME:-$HOME/.hermes}"
+hermes pets off                              # спрятать, не удаляя файлы
+hermes pets remove r2d2                      # или: rm -rf "$H/pets/r2d2"
+rm -rf "$H/desktop-plugins/r2-voice"         # убрать речевой пузырь
 hermes config set display.pet.enabled false  # если питомец не нужен совсем
 ```
 
 Ничего, кроме этих путей, установка не трогает: конфиг правится только через
-`hermes config set`, поэтому откат — это те же три шага в обратную сторону. Если пропал звук
-пузыря или питомец не показывается — `hermes doctor` и `hermes pets doctor`.
+`hermes config set`, поэтому откат — это те же три шага в обратную сторону.
+
+### Шаг 9. Что проверить после установки
+
+```bash
+hermes pets doctor                # видит ли Hermes питомца и какой режим отрисовки
+hermes pets show r2d2 --cycle     # проиграть все 9 состояний в терминале
+hermes pets list --installed      # r2d2 в списке
+```
+
+`hermes pets doctor` печатает `pets dir`, `enabled`, `slug` и `detected graphics`. Если там
+`effective mode (TTY): off` — это про отрисовку в терминале, на десктоп/вебапп не влияет.
+
+Важно: **в конвейере и при перенаправлении вывода питомец не рисуется** (`hermes … | tee`,
+`> log`) — это поведение хоста, а не поломка. Смотреть анимацию нужно в интерактивном TUI или в
+окне приложения/вебаппа.
 
 ---
 
@@ -319,20 +339,26 @@ ctx.onEvent('tool.start', () => ctx.pet.say('кручу гайки…', { id: 'r
 | тишина >60 с | «проверяю датчики…», «не сплю…» |
 
 Ограничения хоста: 120 символов на строку, TTL 1–30 с, ≤3 живых строк, 10 `say` за 10 с — плагин
-сам тормозит себя до одной фразы в 3.5 с.
+сам тормозит себя до одной фразы в 3.5 с (для ошибок — 1.5 с, отдельным окном).
 
 Подпись с именем плагина над репликой хост рисует безусловно; она скрывается стилем, который
-плагин внедряет при загрузке и убирает при выгрузке:
+плагин внедряет при загрузке и убирает при выгрузке. Селектор **привязан к своему плагину**, чтобы
+не трогать чужие пузыри:
 
 ```css
-[data-slot="pet-plugin-bubble"] > span:first-child { display: none !important; }
+[data-pet-plugin="r2-voice"] > span:first-child { display: none !important; }
 ```
+
+Окна троттлинга раздельные: обычные реплики — не чаще одной в 3.5 с, ошибка — 1.5 с, чтобы
+«упс, сломалось» не терялось из-за «кручу гайки…» за секунду до него. «Готово» говорит только
+`turn.settled`: `message.complete` дублировал бы его и на длинных ходах съедал слот.
 
 Установка плагина:
 
 ```bash
-mkdir -p ~/.hermes/desktop-plugins/r2-voice
-cp desktop-plugins/r2-voice/plugin.js ~/.hermes/desktop-plugins/r2-voice/
+H="${HERMES_HOME:-$HOME/.hermes}"
+mkdir -p "$H/desktop-plugins/r2-voice"
+cp desktop-plugins/r2-voice/plugin.js "$H/desktop-plugins/r2-voice/"
 # затем перезагрузить страницу/приложение — плагин подхватится с диска
 ```
 
@@ -365,6 +391,22 @@ frame.save('one.png')
 Константы для правки: `CELL_W`, `CELL_H`, `BASE_Y` (линия земли), `SS` (суперсэмплинг).
 
 ---
+
+## Ревью и благодарности
+
+Версию 1.1 ревьюил **Джарвис** (агент на Raspberry Pi 5) — по его замечаниям:
+
+* пути установки переведены на `${HERMES_HOME:-$HOME/.hermes}` (профили Hermes живут не в `~/.hermes`);
+* CSS-селектор подписи сужен до `[data-pet-plugin="r2-voice"]` — глобальный вариант ломал пузыри
+  других плагинов и зависел от структуры DOM хоста;
+* троттлинг ошибок отделён от обычных реплик, «готово» говорит только `turn.settled`;
+* добавлен раздел «что проверить после установки» (`pets doctor`, `show --cycle`, поведение в
+  конвейере).
+
+Его же замечания «на следующий проход», пока не сделаны: рефакторинг генератора в модуль с классом
+`Canvas` (сейчас один файл с вложенными замыканиями), вынос превью-GIF в релиз-ассет ради веса
+истории. Контракт атласа, вызовы `ctx.pet.say`, лицензия и размеры репозитория проверены им как
+корректные.
 
 ## Лицензия и оговорка
 

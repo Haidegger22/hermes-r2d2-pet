@@ -367,8 +367,31 @@ def build_atlas() -> Image.Image:
     return atlas
 
 
+def self_check(atlas: Image.Image) -> None:
+    """Контракт petdex: 1536×1872, и колонки 7–8 каждой строки должны быть пустыми."""
+    assert atlas.size == (8 * CELL_W, 9 * CELL_H), f"размер атласа: {atlas.size}"
+    for row in range(9):
+        for col in (6, 7):
+            box = (col * CELL_W, row * CELL_H, (col + 1) * CELL_W, (row + 1) * CELL_H)
+            assert atlas.crop(box).getbbox() is None, f"лишние пиксели в колонке {col}, строке {row}"
+
+
 if __name__ == "__main__":
-    out = Path(sys.argv[1] if len(sys.argv) > 1 else "r2_atlas.png")
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Нарисовать атлас R2-D2 для Hermes (petdex, 1536x1872).")
+    ap.add_argument("-o", "--out", default="r2_atlas.png", help="куда сохранить PNG")
+    ap.add_argument("--ss", type=int, default=SS, help="суперсэмплинг (по умолчанию 4)")
+    ap.add_argument("--no-check", action="store_true", help="не проверять контракт после сборки")
+    args = ap.parse_args()
+
+    if args.ss != SS:  # меняется только через модуль: SS участвует в замыканиях примитивов
+        globals()["SS"] = args.ss
+
     atlas = build_atlas()
+    if not args.no_check:
+        self_check(atlas)
+    out = Path(args.out)
     atlas.save(out)
-    print(out, atlas.size)
+    print(f"{out} — {atlas.size[0]}x{atlas.size[1]}, Pillow {Image.__version__ if hasattr(Image, '__version__') else 'n/a'}")
+

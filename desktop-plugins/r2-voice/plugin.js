@@ -1,10 +1,12 @@
-// «Голос R2» — речевой пузырь R2-D2 (Пятница, Pi4)
+// «Голос R2» — речевой пузырь R2-D2 (Hermes Agent: desktop / webapp)
 //
-// Плагин Desktop/Webapp: подписывается на поток шлюза и короткими русскими
-// фразами говорит в речевом пузыре питомца, чем занята Пятница.
-// Только ctx.pet.say — никаких своих оверлеев и правок ядра.
+// Плагин подписывается на поток шлюза и короткими русскими фразами говорит в
+// речевом пузыре питомца, чем занят агент. Только ctx.pet.say — никаких своих
+// оверлеев и правок ядра.
 //
-// Ставится в ~/.hermes/desktop-plugins/r2-voice/plugin.js
+// Установка: $HERMES_HOME/desktop-plugins/r2-voice/plugin.js (по умолчанию
+// ~/.hermes/desktop-plugins/r2-voice/plugin.js). Перезагрузить страницу вебаппа
+// или приложение — плагин читается с диска.
 
 const LINES = {
   start: ['берусь за дело…', 'так, поехали…', 'включаюсь в работу…', 'есть задача, иду…'],
@@ -14,12 +16,18 @@ const LINES = {
   idle: ['всё под контролем…', 'проверяю датчики…', 'не сплю…', 'скучаю по задачам…', 'системы в норме…']
 }
 
+const ID = 'r2-voice'
+const INFO_ID = `${ID}:info`
+const ERROR_ID = `${ID}:error`
+const INFO_GAP_MS = 3500
+const ERROR_GAP_MS = 1500 // ошибка — самая нужная реплика, её не глушим общим окном
+
 const pick = list => list[Math.floor(Math.random() * list.length)]
 
 export default {
-  id: 'r2-voice',
+  id: ID,
   name: 'Голос R2',
-  description: 'R2-D2 бормочет по-русски в речевом пузыре о том, чем занята Пятница',
+  description: 'R2-D2 бормочет по-русски в речевом пузыре о том, чем занят агент',
   defaultEnabled: true,
 
   register(ctx) {
@@ -29,47 +37,55 @@ export default {
       return // старый хост без пет-двери
     }
 
-    // Пузырь рисует надпись с именем плагина над репликой — она лишняя и
-    // съедает высоту. Прячем только её, остальные пузыри не трогаем.
+    // Хост печатает имя плагина над каждой репликой. Прячем только СВОЙ пузырь:
+    // селектор привязан к data-pet-plugin="r2-voice", чужие плагины не задеты.
     const style = document.createElement('style')
 
     style.textContent =
-      '[data-slot="pet-plugin-bubble"] > span:first-child{display:none!important}' +
-      '[data-slot="pet-plugin-bubble"]{gap:0!important;padding:5px 8px!important}'
+      `[data-pet-plugin="${ID}"] > span:first-child{display:none!important}` +
+      `[data-pet-plugin="${ID}"]{gap:0!important;padding:5px 8px!important}`
     document.head.appendChild(style)
     ctx.onDispose(() => style.remove())
 
-    let lastSaidAt = 0
+    // Раздельные окна троттлинга, чтобы «упс, сломалось» не терялось из-за
+    // «кручу гайки…» за секунду до него.
+    let lastInfoAt = 0
+    let lastErrorAt = 0
 
-    // Не чаще одной фразы в 3.5 с: шина шлёт tool.start пачками, а лимит хоста
-    // — 10 «say» за 10 с на плагин.
-    const speak = (text, options = {}) => {
+    const speak = (text, { tone = 'info', ttlMs = 8000 } = {}) => {
       const now = Date.now()
+      const isError = tone === 'error'
 
-      if (now - lastSaidAt < 3500) {
+      if (now - (isError ? lastErrorAt : lastInfoAt) < (isError ? ERROR_GAP_MS : INFO_GAP_MS)) {
         return
       }
 
-      lastSaidAt = now
-      say(text, { id: 'r2-voice', ttlMs: 8000, ...options })
+      if (isError) {
+        lastErrorAt = now
+      } else {
+        lastInfoAt = now
+      }
+
+      say(text, { id: isError ? ERROR_ID : INFO_ID, tone, ttlMs })
     }
 
     ctx.onEvent('message.start', () => speak(pick(LINES.start)))
     ctx.onEvent('tool.start', () => speak(pick(LINES.tool)))
+    // Один источник «готово» — turn.settled. message.complete дублировал бы его
+    // и на длинных ходах съедал слот троттлинга.
     ctx.onEvent('turn.settled', () => speak(pick(LINES.done)))
-    ctx.onEvent('message.complete', () => speak(pick(LINES.done)))
     ctx.onEvent('message.error', () => speak(pick(LINES.error), { tone: 'error', ttlMs: 10000 }))
 
     // Тихая болтовня, когда долго ничего не происходит.
     ctx.setInterval(() => {
-      if (Date.now() - lastSaidAt > 60_000) {
+      if (Date.now() - Math.max(lastInfoAt, lastErrorAt) > 60_000) {
         speak(pick(LINES.idle), { ttlMs: 7000 })
       }
     }, 90_000)
 
     // Приветствие при загрузке — заодно проверка, что пузырь живой.
     ctx.setTimeout(() => {
-      lastSaidAt = 0
+      lastInfoAt = 0
       speak('на связи, Артём ✨', { ttlMs: 6000 })
     }, 2500)
   }
