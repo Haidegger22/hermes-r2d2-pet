@@ -70,6 +70,158 @@ PY
 
 ---
 
+## Установка без git — пошагово через терминал
+
+Git не нужен: все файлы лежат в репозитории по прямым ссылкам, и Hermes забирает питомца из
+`~/.hermes/pets/<slug>/` — то есть достаточно скачать два файла в нужную папку. Ниже — весь путь
+командами, по одному шагу, с проверками после каждого.
+
+Все команды выполняются на той машине, где живёт Hermes (у нас — Pi4).
+
+### Шаг 0. Убедиться, что Hermes на месте
+
+```bash
+hermes --version
+hermes pets --help | head -3
+ls -d ~/.hermes/pets 2>/dev/null || echo "папки pets пока нет — создастся на шаге 2"
+```
+
+### Шаг 1. Задать адрес репозитория (чтобы не повторять длинные URL)
+
+```bash
+REPO=https://raw.githubusercontent.com/Haidegger22/hermes-r2d2-pet/main
+```
+
+### Шаг 2. Создать папки и скачать файлы
+
+```bash
+mkdir -p ~/.hermes/pets/r2d2 ~/.hermes/desktop-plugins/r2-voice
+
+# спрайт-атлас (423 КБ) — сам питомец
+curl -fL -o ~/.hermes/pets/r2d2/spritesheet.png "$REPO/pet/spritesheet.png"
+
+# метаданные: имя, описание, откуда брать картинку
+curl -fL -o ~/.hermes/pets/r2d2/pet.json       "$REPO/pet/pet.json"
+
+# плагин речевого пузыря (необязательно, можно поставить позже)
+curl -fL -o ~/.hermes/desktop-plugins/r2-voice/plugin.js \
+  "$REPO/desktop-plugins/r2-voice/plugin.js"
+```
+
+Флаг `-f` важен: с ним `curl` падает с ошибкой на 404 вместо того, чтобы записать в файл страницу
+«Not Found» (иначе получится битый PNG, и питомец молча не появится).
+
+### Шаг 3. Проверить, что скачалось именно то
+
+```bash
+ls -l ~/.hermes/pets/r2d2/
+file ~/.hermes/pets/r2d2/spritesheet.png
+cat ~/.hermes/pets/r2d2/pet.json
+```
+
+Ожидаемо: `spritesheet.png` — PNG 1536×1872, размер около 423 КБ; `pet.json` — короткий JSON с
+`"id": "r2d2"`, `"displayName": "R2-D2"` и `"spritesheetPath": "spritesheet.png"`.
+
+Строгая проверка атласа встроенным валидатором Hermes (тот самый, что у petdex):
+
+```bash
+~/.hermes/hermes-agent/venv/bin/python - <<'PY'
+from PIL import Image
+from agent.pet.generate import atlas as A
+import sys
+sys.path.insert(0, '/home/pi/.hermes/hermes-agent')
+img = Image.open('/home/pi/.hermes/pets/r2d2/spritesheet.png')
+print(A.validate_atlas(img))
+PY
+```
+
+Если путь к питону Hermes другой (другая раскладка установки) — найти его так:
+
+```bash
+find ~ -maxdepth 5 -path '*hermes-agent/venv/bin/python' 2>/dev/null | head -3
+```
+
+Проверка необязательная: для одного питомца достаточно `file` выше (PNG 1536×1872). Валидатор
+нужен, если ты собрал атлас сам и хочешь убедиться, что сетка и состояния на месте.
+
+### Шаг 4. Включить питомца
+
+```bash
+hermes pets select r2d2           # запишет display.pet.slug=r2d2 и включит показ
+hermes config set display.pet.enabled true
+hermes config get display.pet     # проверка: enabled: true, slug: r2d2
+hermes pets list --installed      # ожидаемо: "r2d2   R2-D2"
+```
+
+Размер подгоняется одной командой (0.1 … 3.0, по умолчанию 0.33):
+
+```bash
+hermes pets scale 0.45
+```
+
+Питомец появляется сразу в CLI/TUI; в десктопе и вебаппе — после перезагрузки страницы или
+приложения (рендерер забирает атлас при старте).
+
+### Шаг 5. Включить прогулку по экрану (только вебапп/десктоп)
+
+Это настройка рендерера, CLI-команды у неё нет. Два способа:
+
+* через интерфейс: **Настройки → Питомец → «Гуляет»**;
+* через консоль браузера (F12 → Console) на странице вебаппа:
+
+```js
+localStorage.setItem('hermes.desktop.pet-roam.v1', 'true')
+location.reload()
+```
+
+Выключить обратно — тем же ключом со значением `'false'`.
+
+### Шаг 6. Перезагрузить плагин голоса
+
+Плагины десктопа читаются с диска при старте: достаточно перезагрузить страницу вебаппа или
+перезапустить десктоп-приложение. Если приложение нативное и хочется наверняка:
+
+```bash
+systemctl --user restart hermes-gateway     # перезапустит шлюз и подтянет плагины
+```
+
+Проверка, что пузырь живой: в консоли браузера (на странице вебаппа) через пару секунд после
+перезагрузки:
+
+```js
+document.querySelector('[data-slot="pet-plugin-bubble"]')?.innerText
+```
+
+Должно появиться приветствие «на связи, Артём ✨» (или любая реплика по событию).
+
+### Шаг 7. Полный архив без git (альтернатива пошаговой загрузке)
+
+Если удобнее забрать всё разом — GitHub отдаёт tarball ветки:
+
+```bash
+cd /tmp
+curl -fL -o r2.tgz https://github.com/Haidegger22/hermes-r2d2-pet/archive/refs/heads/main.tar.gz
+tar xzf r2.tgz
+mkdir -p ~/.hermes/pets/r2d2 ~/.hermes/desktop-plugins/r2-voice
+cp hermes-r2d2-pet-main/pet/spritesheet.png hermes-r2d2-pet-main/pet/pet.json ~/.hermes/pets/r2d2/
+cp hermes-r2d2-pet-main/desktop-plugins/r2-voice/plugin.js ~/.hermes/desktop-plugins/r2-voice/
+```
+
+### Шаг 8. Откат и удаление
+
+```bash
+hermes pets off                      # спрятать питомца
+hermes pets remove r2d2              # удалить файлы питомца из ~/.hermes/pets/
+rm -rf ~/.hermes/desktop-plugins/r2-voice    # убрать речевой пузырь
+hermes config set display.pet.enabled false  # если питомец не нужен совсем
+```
+
+Ничего, кроме этих путей, установка не трогает: конфиг правится только через
+`hermes config set`, поэтому откат — это те же три шага в обратную сторону. Если пропал звук
+пузыря или питомец не показывается — `hermes doctor` и `hermes pets doctor`.
+
+---
+
 ## Как нарисовано
 
 ### 1. Суперсэмплинг
