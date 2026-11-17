@@ -41,8 +41,12 @@ def draw_droid(
     squeeze: float = 1.0,
     third_leg: bool = False,
     body_light: float = 0.0,
+    lamp: float = 0.0,
 ) -> Image.Image:
-    """One upright R2-D2 frame; feet on BASE_Y, centred on x=96."""
+    """Один кадр R2-D2 анфас; стопы на BASE_Y, центр по x=96.
+
+    lamp 0..1 — яркость лампочки над куполом (горит, пока агент работает).
+    """
     img = Image.new("RGBA", (CELL_W * SS, CELL_H * SS), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
 
@@ -147,6 +151,15 @@ def draw_droid(
     ell(96 - 6, 72 - lens_h, 96 + 6, 72 + lens_h, eye_color)
     if eye_open > 0.5:
         ell(92, 66, 97, 70, (255, 255, 255, 230))
+
+    # ── лампочка над куполом ──────────────────────────────────────────────────
+    if lamp > 0.02:
+        lv = max(0.0, min(1.0, lamp))
+        rect(95.0, 17.0, 97.0, 21.5, (146, 156, 168, int(200 * lv)))       # цоколь
+        ell(96 - 10.5, 2.5, 96 + 10.5, 23.5, (255, 208, 110, int(52 * lv)))  # ореол
+        ell(96 - 7.0, 6.0, 96 + 7.0, 20.0, (255, 198, 86, int(120 * lv)))
+        ell(96 - 4.4, 8.6, 96 + 4.4, 17.4, (255, 226, 140, int(225 * lv)))
+        ell(96 - 2.4, 10.6, 96 + 2.4, 15.4, (255, 252, 226, int(255 * lv)))
 
     return img.resize((CELL_W, CELL_H), Image.LANCZOS)
 
@@ -305,14 +318,22 @@ def frame(kind: str, i: int) -> tuple[Image.Image, float]:
                           dome_turn=0.05 * math.sin(tau),
                           body_light=1 if i in (1, 4) else 0), -2 * (0.5 - 0.5 * math.cos(tau * 2))
 
-    if kind in ("running-right", "running"):
+    if kind == "running":
+        # агент работает (Артём только что отправил запрос): стоим анфас,
+        # над куполом мигает лампочка
+        lamp_seq = (1.0, 1.0, 0.55, 0.0, 0.0, 0.35)
+        return draw_droid(lamp=lamp_seq[i], body_light=1 if lamp_seq[i] > 0.5 else 0,
+                          dome_turn=0.05 * math.sin(tau),
+                          eye_open=1.0), -1.5 * abs(math.sin(tau))
+
+    if kind == "running-right":
         wheel = i / 6.0
         puff = (0.30, 0.65, 0.95, 0.75, 0.45, 0.20)[i]
         return draw_droid_side(rolling=True, wheel=wheel, dust=puff,
                                dome_turn=0.06 * math.sin(2 * math.pi * wheel),
                                eye_open=1.0,
-                               lean=(-10 if kind == "running-right" else -8) - 1.0 * math.sin(2 * math.pi * wheel),
-                               body_light=1 if kind == "running" else 0), 0.0
+                               lean=-10 - 1.0 * math.sin(2 * math.pi * wheel),
+                               body_light=0), 0.0
 
     if kind == "waving":
         out = math.sin(tau) if math.sin(tau) > 0 else 0.0
