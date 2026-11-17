@@ -43,7 +43,13 @@ export default {
 
     style.textContent =
       `[data-pet-plugin="${ID}"] > span:first-child{display:none!important}` +
-      `[data-pet-plugin="${ID}"]{gap:0!important;padding:5px 8px!important}`
+      `[data-pet-plugin="${ID}"]{gap:0!important;padding:5px 8px!important}` +
+      // Хост зеркалит спрайт (scaleX(-1)), когда центр питомца уходит на левую
+      // половину окна — это для артов, нарисованных «смотрящими влево». Наш
+      // анфас смотрит на зрителя, ему переворот не нужен: гасим transform у
+      // обёртки ИМЕННО нашего спрайта (по aria-label канваса). !important
+      // перебивает инлайновый transform, который ставит хост.
+      `div:has(> canvas[aria-label$=" pet"]){transform:none!important}`
     document.head.appendChild(style)
     ctx.onDispose(() => style.remove())
 

@@ -104,8 +104,7 @@ def draw_droid(
 
     # ── torso: taller, cylindrical ────────────────────────────────────────────
     rect(57, 84, 135, 170, WHITE, r=10)
-    rect(57, 84, 68, 170, WHITE_SH, r=8)            # кромка в тени (левая)
-    rect(124, 84, 135, 170, WHITE_SH, r=8)          # кромка в тени (правая)
+    rect(57, 84, 68, 170, WHITE_SH, r=8)            # left shading
     rect(62, 90, 130, 100, BLUE, r=4)               # top band
     rect(62, 154, 130, 164, BLUE, r=4)              # bottom band
     rect(88, 102, 104, 152, WHITE_SH, r=3)          # centre spine
@@ -115,9 +114,7 @@ def draw_droid(
     rect(108, 104, 128, 136, BLUE_DK, r=4)
     rect(66, 142, 80, 150, BLUE_LT, r=2)            # small service panel
     rect(112, 142, 126, 150, BLUE_LT, r=2)
-    light = AMBER if body_light > 0.5 else RED
-    ell(66, 131, 76, 141, light)                                 # индикаторы: пара, симметрично
-    ell(116, 131, 126, 141, light)
+    ell(116, 130, 126, 140, AMBER if body_light > 0.5 else RED)  # status light
     # neck ring
     rect(58, 80, 134, 87, WHITE_DK, r=3)
 
@@ -132,33 +129,28 @@ def draw_droid(
     # ── dome: sits flush on the neck ring ─────────────────────────────────────
     ell(63, 50, 129, 106, WHITE)
     ell(65, 53, 127, 102, WHITE)
-    ell(80, 54, 112, 80, (250, 252, 255, 120))     # блик по центру купола
-    # Panels on the dome: mirror-symmetric pairs around x=96. The host mirrors the
-    # whole sprite when the pet's centre sits on the left half of the window, so a
-    # symmetric frontal pose looks identical on both sides (no "flipped" droid).
+    ell(69, 55, 99, 82, (252, 253, 255, 190))      # highlight
+    # rotating blue panels around the dome
     cx, cy = 96, 78
     for ang, (w, h), col in (
-        (90, (14, 9), BLUE_LT),                      # по центру, у макушки
-        (-42, (12, 10), BLUE), (222, (12, 10), BLUE),
-        (-12, (10, 8), BLUE_DK), (192, (10, 8), BLUE_DK),
-        (38, (9, 11), BLUE), (142, (9, 11), BLUE),
+        (-58, (13, 11), BLUE), (-26, (11, 9), BLUE_DK), (8, (10, 13), BLUE_LT),
+        (44, (9, 9), BLUE), (128, (12, 10), BLUE_DK), (170, (9, 12), BLUE_LT),
     ):
-        a = math.radians(ang)
-        px = cx + math.cos(a) * 23
-        py = cy + math.sin(a) * 9
+        a = math.radians(ang + dome_turn * 60)
+        px = cx + math.cos(a) * 22
+        py = cy + math.sin(a) * 8
         rect(px - w / 2, py - h / 2, px + w / 2, py + h / 2, col, r=2)
-    # antennas: равной длины и симметрично, чтобы кадр был зеркально-инвариантным
-    rect(86, 18, 88, 48, SILVER, r=1)
-    rect(104, 18, 106, 48, SILVER, r=1)
-    ell(85, 15, 89, 19, BLUE_LT)
-    ell(103, 15, 107, 19, BLUE_LT)
+    # two antennas, different lengths
+    rect(86, 22, 88, 48, SILVER, r=1)
+    rect(102, 12, 104, 48, SILVER, r=1)
+    ell(101, 9, 105, 13, BLUE_LT)
     # photoreceptor: dark lens with a small cyan glint
     ell(83, 61, 109, 83, DARK)
     ell(87, 64, 105, 80, EYE_BODY)
     lens_h = max(1.2, 6 * eye_open)
     ell(96 - 6, 72 - lens_h, 96 + 6, 72 + lens_h, eye_color)
     if eye_open > 0.5:
-        ell(93, 66, 99, 70, (255, 255, 255, 230))
+        ell(92, 66, 97, 70, (255, 255, 255, 230))
 
     # ── лампочка над куполом ──────────────────────────────────────────────────
     if lamp > 0.02:
